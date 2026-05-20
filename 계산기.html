@@ -1,0 +1,872 @@
+```html
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CASIO fx-570CW 스타일 공학용 계산기</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Math.js CDN (강력하고 안전한 수학 수식 계산 및 복소수 지원) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ChareInk:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&family=Pretendard:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: radial-gradient(circle at center, #1e293b, #0f172a);
+        }
+
+        /* 카시오 LCD 디스플레이 느낌 구현 */
+        .lcd-screen {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: #cbd5e1;
+            color: #0f172a;
+            box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.3);
+            text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.4);
+        }
+
+        /* 둥글둥글한 카시오 스타일 버튼 가공 */
+        .casio-btn {
+            border-radius: 9999px;
+            box-shadow: 0 3px 0px #1e293b, 0 4px 6px rgba(0,0,0,0.4);
+            transition: all 0.05s ease;
+            position: relative;
+        }
+        .casio-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0px #1e293b, 0 2px 3px rgba(0,0,0,0.4);
+        }
+
+        /* Shift 라벨 표기용 스타일 */
+        .shift-label {
+            font-size: 9px;
+            color: #f59e0b; /* 황색 Shift 기능 표시 */
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        /* 스크롤바 커스텀 */
+        .lcd-scroll::-webkit-scrollbar {
+            height: 3px;
+        }
+        .lcd-scroll::-webkit-scrollbar-thumb {
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex items-center justify-center p-2 sm:p-4 selection:bg-indigo-500/30">
+
+    <!-- 계산기 본체 케이스 (카시오 fx-570CW 특유의 슬림하고 둥근 엣지 실루엣) -->
+    <div class="w-full max-w-[370px] bg-neutral-900 border-[6px] border-neutral-800 rounded-[40px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] p-5 flex flex-col justify-between relative overflow-hidden">
+        
+        <!-- 데코용 로고 및 기기명 -->
+        <div class="flex justify-between items-center mb-3 px-1">
+            <div class="flex flex-col">
+                <span class="text-neutral-300 font-bold text-lg tracking-wider font-sans">CASIO</span>
+                <span class="text-[9px] text-neutral-500 font-mono -mt-1">fx-570CW EMULATOR</span>
+            </div>
+            <div class="text-right">
+                <span class="text-[10px] text-neutral-400 font-semibold tracking-tighter bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700">CLASSWIZ</span>
+                <span class="block text-[8px] text-amber-500 font-bold font-sans mt-0.5">NATURAL-V.P.A.M.</span>
+            </div>
+        </div>
+
+        <!-- LCD 디스플레이 화면 -->
+        <div class="lcd-screen rounded-xl p-3 mb-4 flex flex-col justify-between min-h-[110px] relative border border-neutral-700">
+            <!-- 상태 표시 바 -->
+            <div class="flex justify-between items-center text-[10px] font-bold border-b border-slate-400/50 pb-1 mb-1">
+                <div class="flex gap-2">
+                    <span id="indicator-shift" class="opacity-20 text-amber-600 transition-opacity duration-150">S</span>
+                    <span id="indicator-mode" class="text-slate-700">MATH</span>
+                </div>
+                <div class="flex gap-1.5">
+                    <span id="indicator-angle" class="bg-slate-800 text-slate-200 px-1 rounded-[3px] text-[9px] cursor-pointer" onclick="toggleAngleUnit()">DEG</span>
+                    <span id="indicator-complex" class="opacity-20 text-slate-800">i</span>
+                </div>
+            </div>
+
+            <!-- 디스플레이 출력 영역 -->
+            <div class="flex flex-col items-end w-full">
+                <!-- 수식 입력 공간 -->
+                <div id="lcd-formula" class="w-full text-right text-base font-semibold tracking-wide truncate lcd-scroll overflow-x-auto text-slate-800/80 mb-1 leading-normal"></div>
+                <!-- 결과 출력 공간 -->
+                <div id="lcd-result" class="w-full text-right text-2xl font-bold tracking-tight text-slate-900 overflow-x-auto select-all leading-none">0</div>
+            </div>
+        </div>
+
+        <!-- 십자 방향키 클러스터 및 주요 메뉴 제어부 -->
+        <div class="grid grid-cols-4 gap-2 mb-4 items-center px-1">
+            <!-- 왼쪽: SHIFT & SETTINGS -->
+            <div class="flex flex-col gap-2">
+                <button onclick="toggleShift()" id="btn-shift" class="casio-btn bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-black py-1.5 shadow-[0_3px_0_#d97706] rounded-lg transition-all flex flex-col items-center justify-center leading-tight">
+                    <span class="text-[8px] tracking-tighter">SHIFT</span>
+                    <i data-lucide="chevrons-up" class="w-3 h-3"></i>
+                </button>
+                <button onclick="showMenuModal()" class="casio-btn bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] py-1.5 shadow-[0_3px_0_#171717] rounded-lg">
+                    MENU
+                </button>
+            </div>
+
+            <!-- 가운데: 원형 십자 방향키 조작부 -->
+            <div class="col-span-2 flex justify-center py-1">
+                <div class="relative w-20 h-20 bg-neutral-800 border-2 border-neutral-700 rounded-full flex items-center justify-center shadow-inner">
+                    <button onclick="navigateHistory('up')" class="absolute top-1 p-1 text-neutral-400 hover:text-white" title="이전 계산"><i data-lucide="chevron-up" class="w-4 h-4"></i></button>
+                    <button onclick="navigateHistory('down')" class="absolute bottom-1 p-1 text-neutral-400 hover:text-white" title="다음 계산"><i data-lucide="chevron-down" class="w-4 h-4"></i></button>
+                    <button onclick="cursorMove('left')" class="absolute left-1 p-1 text-neutral-400 hover:text-white"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                    <button onclick="cursorMove('right')" class="absolute right-1 p-1 text-neutral-400 hover:text-white"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                    <div class="w-8 h-8 bg-neutral-900 rounded-full border border-neutral-800 flex items-center justify-center text-[9px] text-neutral-500 font-bold">OK</div>
+                </div>
+            </div>
+
+            <!-- 오른쪽: TOOLS & BACK/DELETE -->
+            <div class="flex flex-col gap-2">
+                <button onclick="showToolsModal()" class="casio-btn bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] py-1.5 shadow-[0_3px_0_#171717] rounded-lg">
+                    TOOLS
+                </button>
+                <button onclick="backspace()" class="casio-btn bg-rose-950/90 hover:bg-rose-900 text-rose-300 text-[10px] font-bold py-1.5 shadow-[0_3px_0_#9f1239] rounded-lg flex items-center justify-center gap-0.5">
+                    DEL
+                </button>
+            </div>
+        </div>
+
+        <!-- 공학용 기능 전용 버튼 영역 (검은색 미니 원형 단추) -->
+        <div class="grid grid-cols-4 gap-x-2.5 gap-y-4 mb-4 pt-3 border-t border-neutral-800">
+            <!-- 1행: 변수, 함수, 카탈로그, 형식 -->
+            <div class="relative">
+                <span class="shift-label">i</span>
+                <button onclick="handleKey('i')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">x</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">x⁻¹</span>
+                <button onclick="handleKey('recip')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">f(x)</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">√</span>
+                <button onclick="handleKey('sqrt')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">catalog</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">^</span>
+                <button onclick="handleKey('pow')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">format</button>
+            </div>
+
+            <!-- 2행: 삼각함수 삼형제 -->
+            <div class="relative">
+                <span class="shift-label">sin⁻¹</span>
+                <button onclick="handleKey('sin')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">sin</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">cos⁻¹</span>
+                <button onclick="handleKey('cos')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">cos</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">tan⁻¹</span>
+                <button onclick="handleKey('tan')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">tan</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">ln</span>
+                <button onclick="handleKey('log10')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">log</button>
+            </div>
+
+            <!-- 3행: 괄호 및 고급 기호 -->
+            <div class="relative">
+                <span class="shift-label">π</span>
+                <button onclick="handleKey('(')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 text-xs font-black">(</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">e</span>
+                <button onclick="handleKey(')')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 text-xs font-black">)</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">abs</span>
+                <button onclick="handleKey(',')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">S⇔D</button>
+            </div>
+            <div class="relative">
+                <span class="shift-label">x!</span>
+                <button onclick="handleKey('fact')" class="casio-btn w-full h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-bold">a/b</button>
+            </div>
+        </div>
+
+        <!-- 하단: 주 숫자 키패드 (그레이/실버 톤 입체 키) -->
+        <div class="grid grid-cols-4 gap-2.5">
+            <!-- 7 8 9 AC -->
+            <button onclick="pressNum('7')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">7</button>
+            <button onclick="pressNum('8')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">8</button>
+            <button onclick="pressNum('9')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">9</button>
+            <button onclick="clearScreen()" class="casio-btn h-11 bg-neutral-700 hover:bg-neutral-600 text-amber-500 text-sm font-bold shadow-[0_3px_0_#404040]">AC</button>
+
+            <!-- 4 5 6 * -->
+            <button onclick="pressNum('4')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">4</button>
+            <button onclick="pressNum('5')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">5</button>
+            <button onclick="pressNum('6')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">6</button>
+            <button onclick="pressOp('*')" class="casio-btn h-11 bg-neutral-800 hover:bg-neutral-750 text-slate-200 text-lg font-semibold shadow-[0_3px_0_#262626]">×</button>
+
+            <!-- 1 2 3 / -->
+            <button onclick="pressNum('1')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">1</button>
+            <button onclick="pressNum('2')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">2</button>
+            <button onclick="pressNum('3')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">3</button>
+            <button onclick="pressOp('/')" class="casio-btn h-11 bg-neutral-800 hover:bg-neutral-750 text-slate-200 text-lg font-semibold shadow-[0_3px_0_#262626]">÷</button>
+
+            <!-- 0 . 10^x - -->
+            <button onclick="pressNum('0')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">0</button>
+            <button onclick="pressNum('.')" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-lg font-bold shadow-[0_3px_0_#3f3f46]">.</button>
+            <button onclick="pressTenPower()" class="casio-btn h-11 bg-zinc-700 hover:bg-zinc-600 text-slate-100 text-xs font-bold shadow-[0_3px_0_#3f3f46]">×10ˣ</button>
+            <button onclick="pressOp('-')" class="casio-btn h-11 bg-neutral-800 hover:bg-neutral-750 text-slate-200 text-lg font-semibold shadow-[0_3px_0_#262626]">-</button>
+
+            <!-- (Ans) (Ans) (+) (EXE) -->
+            <button onclick="pressAns()" class="casio-btn h-11 bg-neutral-800 hover:bg-neutral-750 text-neutral-400 text-xs font-bold shadow-[0_3px_0_#262626]">Ans</button>
+            <button onclick="toggleSign()" class="casio-btn h-11 bg-neutral-800 hover:bg-neutral-750 text-neutral-400 text-sm font-bold shadow-[0_3px_0_#262626]">(-)</button>
+            <button onclick="pressOp('+')" class="casio-btn h-11 bg-neutral-800 hover:bg-neutral-750 text-slate-200 text-lg font-semibold shadow-[0_3px_0_#262626]">+</button>
+            <button onclick="execute()" class="casio-btn h-11 bg-indigo-600 hover:bg-indigo-500 text-white text-base font-black shadow-[0_3px_0_#4338ca]">EXE</button>
+        </div>
+
+    </div>
+
+    <!-- 메뉴(계산 모드 설정) 모달창 -->
+    <div id="menu-modal" class="hidden fixed inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-50">
+        <div class="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 w-full max-w-[340px] text-slate-100 space-y-4">
+            <h3 class="text-sm font-bold text-amber-500 flex items-center gap-1">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                카시오 계산 모드 선택 (MENU)
+            </h3>
+            <div class="grid grid-cols-1 gap-2">
+                <button onclick="setMode('normal')" class="w-full text-left py-2.5 px-4 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-semibold flex items-center justify-between border border-neutral-700">
+                    <span>1: 기본 연산 (Calculate)</span>
+                    <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 hidden" id="chk-mode-normal"></i>
+                </button>
+                <button onclick="setMode('complex')" class="w-full text-left py-2.5 px-4 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-semibold flex items-center justify-between border border-neutral-700">
+                    <span>2: 복소수 연산 (Complex)</span>
+                    <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 hidden" id="chk-mode-complex"></i>
+                </button>
+                <button onclick="setMode('equation')" class="w-full text-left py-2.5 px-4 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-semibold flex items-center justify-between border border-neutral-700">
+                    <span>3: 다항 방정식 풀이 (Equation)</span>
+                    <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 hidden" id="chk-mode-equation"></i>
+                </button>
+            </div>
+            <button onclick="closeModal('menu')" class="w-full py-2 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-bold text-slate-400">닫기 (Back)</button>
+        </div>
+    </div>
+
+    <!-- TOOLS (도구 옵션) 모달창 -->
+    <div id="tools-modal" class="hidden fixed inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-50">
+        <div class="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 w-full max-w-[340px] text-slate-100 space-y-4">
+            <h3 class="text-sm font-bold text-indigo-400 flex items-center gap-1">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                계산 설정 도구 (TOOLS)
+            </h3>
+            <div class="space-y-3">
+                <div class="bg-neutral-950 p-3 rounded-xl border border-neutral-800">
+                    <span class="block text-[11px] text-neutral-400 mb-2">삼각함수 각도 규격</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="setAngleUnit('DEG')" id="tool-deg" class="py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-xs font-bold text-slate-200">Degree (도)</button>
+                        <button onclick="setAngleUnit('RAD')" id="tool-rad" class="py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-xs font-bold text-slate-200">Radian (라디안)</button>
+                    </div>
+                </div>
+
+                <div class="bg-neutral-950 p-3 rounded-xl border border-neutral-800">
+                    <span class="block text-[11px] text-neutral-400 mb-2">계산 내역 클립보드</span>
+                    <button onclick="copyToClipboard()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold flex items-center justify-center gap-1">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        화면 전체 수식 복사
+                    </button>
+                </div>
+            </div>
+            <button onclick="closeModal('tools')" class="w-full py-2 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-bold text-slate-400">닫기 (Back)</button>
+        </div>
+    </div>
+
+    <!-- 팝업 메시지 (토스트) -->
+    <div id="toast-notif" class="opacity-0 pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-neutral-700 text-slate-100 text-xs px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 transition-all duration-300">
+        <i data-lucide="info" class="w-4 h-4 text-amber-500"></i>
+        <span id="toast-text">메시지</span>
+    </div>
+
+    <script>
+        // 에뮬레이터 상태 관리
+        let isShiftActive = false;
+        let isDegreeMode = true; // true = DEG, false = RAD
+        let currentMode = 'normal'; // normal, complex, equation
+        
+        let expression = ''; // 수식용 내부 자바스크립트용 데이터
+        let displayExpr = ''; // 화면 노출용 카시오 포맷팅 문자열
+        let lastResult = '0';
+        let ansValue = '0';
+
+        // 계산 히스토리
+        let history = [];
+        let historyIndex = -1;
+
+        // 엘리먼트 참조 캐싱
+        const lcdFormula = document.getElementById('lcd-formula');
+        const lcdResult = document.getElementById('lcd-result');
+        const indicatorShift = document.getElementById('indicator-shift');
+        const indicatorAngle = document.getElementById('indicator-angle');
+        const indicatorComplex = document.getElementById('indicator-complex');
+        const indicatorMode = document.getElementById('indicator-mode');
+        const toastNotif = document.getElementById('toast-notif');
+        const toastText = document.getElementById('toast-text');
+
+        window.onload = function() {
+            lucide.createIcons();
+            setMode('normal'); // 초기 모드 지정
+            document.addEventListener('keydown', handlePhysicalKeyboard);
+        };
+
+        // 토스트 팝업 유틸리티
+        function toast(msg) {
+            toastText.innerText = msg;
+            toastNotif.classList.remove('opacity-0', 'translate-y-2');
+            toastNotif.classList.add('opacity-100');
+            setTimeout(() => {
+                toastNotif.classList.add('opacity-0', 'translate-y-2');
+                toastNotif.classList.remove('opacity-100');
+            }, 2000);
+        }
+
+        // Shift 토글 제어
+        function toggleShift() {
+            isShiftActive = !isShiftActive;
+            if (isShiftActive) {
+                indicatorShift.classList.remove('opacity-20');
+                indicatorShift.classList.add('opacity-100');
+                toast("Shift 모드가 활성화되었습니다 (주황색 기능 가능).");
+            } else {
+                indicatorShift.classList.add('opacity-20');
+                indicatorShift.classList.remove('opacity-100');
+            }
+        }
+
+        function deactivateShift() {
+            isShiftActive = false;
+            indicatorShift.classList.add('opacity-20');
+            indicatorShift.classList.remove('opacity-100');
+        }
+
+        // 각도 모드 DEG/RAD 스위칭
+        function toggleAngleUnit() {
+            isDegreeMode = !isDegreeMode;
+            updateAngleIndicator();
+            toast(`각도 단위가 ${isDegreeMode ? 'DEG (Degree)' : 'RAD (Radian)'}으로 설정되었습니다.`);
+        }
+
+        function setAngleUnit(unit) {
+            isDegreeMode = (unit === 'DEG');
+            updateAngleIndicator();
+            closeModal('tools');
+            toast(`각도 단위가 ${unit}으로 설정되었습니다.`);
+        }
+
+        function updateAngleIndicator() {
+            indicatorAngle.innerText = isDegreeMode ? 'DEG' : 'RAD';
+            const degBtn = document.getElementById('tool-deg');
+            const radBtn = document.getElementById('tool-rad');
+            if (isDegreeMode) {
+                degBtn.className = 'py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold';
+                radBtn.className = 'py-1.5 bg-neutral-800 text-slate-300 hover:bg-neutral-700 rounded-lg text-xs font-bold';
+            } else {
+                degBtn.className = 'py-1.5 bg-neutral-800 text-slate-300 hover:bg-neutral-700 rounded-lg text-xs font-bold';
+                radBtn.className = 'py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold';
+            }
+        }
+
+        // 모달창 오픈/클로즈
+        function showMenuModal() {
+            document.getElementById('menu-modal').classList.remove('hidden');
+        }
+
+        function showToolsModal() {
+            updateAngleIndicator();
+            document.getElementById('tools-modal').classList.remove('hidden');
+        }
+
+        function closeModal(modalType) {
+            document.getElementById(`${modalType}-modal`).classList.add('hidden');
+        }
+
+        // 카시오 계산모드 설정 변경
+        function setMode(mode) {
+            currentMode = mode;
+            closeModal('menu');
+
+            // 체크 아이콘 노출 초기화
+            document.getElementById('chk-mode-normal').classList.add('hidden');
+            document.getElementById('chk-mode-complex').classList.add('hidden');
+            document.getElementById('chk-mode-equation').classList.add('hidden');
+
+            // 화면 인디케이터 조정
+            indicatorComplex.classList.add('opacity-20');
+            clearScreen();
+
+            if (mode === 'normal') {
+                indicatorMode.innerText = 'MATH';
+                document.getElementById('chk-mode-normal').classList.remove('hidden');
+                toast("1: 기본 계산 연산 모드 진입");
+            } else if (mode === 'complex') {
+                indicatorMode.innerText = 'CMPLX';
+                indicatorComplex.classList.remove('opacity-20');
+                document.getElementById('chk-mode-complex').classList.remove('hidden');
+                toast("2: 복소수(i) 수식 연산 모드 진입");
+            } else if (mode === 'equation') {
+                indicatorMode.innerText = 'EQN';
+                document.getElementById('chk-mode-equation').classList.remove('hidden');
+                // 방정식용 초기화 가이드
+                lcdFormula.innerHTML = "f(x) = ax^2 + bx + c = 0";
+                lcdResult.innerHTML = "[a, b, c 입력 대기]";
+                toast("3: 2차 다항 방정식 계수 입력 모드");
+            }
+        }
+
+        // 숫자 패드 입력
+        function pressNum(num) {
+            if (currentMode === 'equation') {
+                handleEquationInput(num);
+                return;
+            }
+
+            expression += num;
+            displayExpr += num;
+            updateScreen();
+        }
+
+        // 연산자 패드 입력
+        function pressOp(op) {
+            if (currentMode === 'equation') {
+                handleEquationInput(op);
+                return;
+            }
+
+            let displayOp = op;
+            if (op === '*') displayOp = '×';
+            if (op === '/') displayOp = '÷';
+
+            expression += op;
+            displayExpr += displayOp;
+            updateScreen();
+        }
+
+        // 전용 과학 함수 키 입력 정의 (Shift 조합 포함)
+        function handleKey(action) {
+            if (currentMode === 'equation') {
+                toast("방정식 모드에서는 사용할 수 없습니다.");
+                return;
+            }
+
+            // SHIFT 활성화 상태 체크 분기
+            if (isShiftActive) {
+                deactivateShift();
+                switch (action) {
+                    case 'i': // i 상단의 Shift 기능 => 상호 치환
+                        expression += 'i';
+                        displayExpr += 'i';
+                        break;
+                    case 'recip': // f(x) 상단의 x⁻¹
+                        expression += '^-1';
+                        displayExpr += '⁻¹';
+                        break;
+                    case 'sqrt': // 루트 상단의 세제곱근
+                        expression += 'cbrt(';
+                        displayExpr += '³√(';
+                        break;
+                    case 'pow': // 거듭제곱 상단의 거듭제곱근
+                        expression += 'nthRoot(';
+                        displayExpr += 'ⁿ√(';
+                        break;
+                    case 'sin': // sin⁻¹
+                        expression += 'asin(';
+                        displayExpr += 'sin⁻¹(';
+                        break;
+                    case 'cos': // cos⁻¹
+                        expression += 'acos(';
+                        displayExpr += 'cos⁻¹(';
+                        break;
+                    case 'tan': // tan⁻¹
+                        expression += 'atan(';
+                        displayExpr += 'tan⁻¹(';
+                        break;
+                    case 'log10': // log 상단의 ln
+                        expression += 'log(';
+                        displayExpr += 'ln(';
+                        break;
+                    case '(': // 괄호 상단의 파이 (π)
+                        expression += 'pi';
+                        displayExpr += 'π';
+                        break;
+                    case ')': // 괄호 상단의 자연상수 (e)
+                        expression += 'e';
+                        displayExpr += 'e';
+                        break;
+                    case ',': // S<=>D 상단의 abs
+                        expression += 'abs(';
+                        displayExpr += 'Abs(';
+                        break;
+                    case 'fact': // a/b 상단의 팩토리얼 (!)
+                        expression += '!';
+                        displayExpr += '!';
+                        break;
+                    default:
+                        toast("지원되지 않는 Shift 조합입니다.");
+                }
+            } else {
+                // 일반 표준 기능 수행
+                switch (action) {
+                    case 'i': // x 변수 (기본 수학 모드에서는 변수로 작동)
+                        expression += 'x';
+                        displayExpr += 'x';
+                        break;
+                    case 'recip': // f(x) 함수
+                        toast("기본 연산 모드입니다.");
+                        break;
+                    case 'sqrt': // 루트
+                        expression += 'sqrt(';
+                        displayExpr += '√(';
+                        break;
+                    case 'pow': // 제곱승
+                        expression += '^';
+                        displayExpr += '^';
+                        break;
+                    case 'sin':
+                        expression += 'sin(';
+                        displayExpr += 'sin(';
+                        break;
+                    case 'cos':
+                        expression += 'cos(';
+                        displayExpr += 'cos(';
+                        break;
+                    case 'tan':
+                        expression += 'tan(';
+                        displayExpr += 'tan(';
+                        break;
+                    case 'log10':
+                        expression += 'log10(';
+                        displayExpr += 'log(';
+                        break;
+                    case '(':
+                        expression += '(';
+                        displayExpr += '(';
+                        break;
+                    case ')' :
+                        expression += ')';
+                        displayExpr += ')';
+                        break;
+                    case ',': // 쉼표 또는 전환
+                        expression += ',';
+                        displayExpr += ',';
+                        break;
+                    case 'fact': // 분수 표기
+                        expression += '/';
+                        displayExpr += ' / ';
+                        break;
+                }
+            }
+            updateScreen();
+        }
+
+        // 지수형태(x10^x) 표현 처리
+        function pressTenPower() {
+            if (currentMode === 'equation') return;
+            expression += '*10^';
+            displayExpr += '×10^';
+            updateScreen();
+        }
+
+        // Ans 최종 결과값 불러오기
+        function pressAns() {
+            if (currentMode === 'equation') return;
+            expression += ansValue;
+            displayExpr += 'Ans';
+            updateScreen();
+        }
+
+        // 양수/음수 치환
+        function toggleSign() {
+            if (currentMode === 'equation') return;
+            if (displayExpr.startsWith('-')) {
+                displayExpr = displayExpr.substring(1);
+                expression = expression.substring(1);
+            } else {
+                displayExpr = '-' + displayExpr;
+                expression = '-' + expression;
+            }
+            updateScreen();
+        }
+
+        // Backspace 한 글자 지우기
+        function backspace() {
+            if (currentMode === 'equation') {
+                if (eqnInputBuffer.length > 0) {
+                    eqnInputBuffer = eqnInputBuffer.slice(0, -1);
+                    lcdResult.innerText = eqnInputBuffer || "0";
+                }
+                return;
+            }
+
+            if (expression.length > 0) {
+                expression = expression.substring(0, expression.length - 1);
+                displayExpr = displayExpr.substring(0, displayExpr.length - 1);
+                updateScreen();
+            }
+        }
+
+        // AC 스크린 전체 클리어
+        function clearScreen() {
+            expression = '';
+            displayExpr = '';
+            lastResult = '0';
+            deactivateShift();
+            
+            if (currentMode === 'equation') {
+                eqnA = null; eqnB = null; eqnC = null;
+                eqnInputBuffer = '';
+                lcdFormula.innerText = "f(x) = ax^2 + bx + c = 0";
+                lcdResult.innerText = "a 계수를 입력해 주세요:";
+                return;
+            }
+
+            lcdFormula.innerText = '';
+            lcdResult.innerText = '0';
+        }
+
+        // LCD 디스플레이 업데이트
+        function updateScreen() {
+            lcdFormula.innerText = displayExpr || '0';
+        }
+
+
+        // ----------------------------------------
+        // 수식 파싱 연산 코어 (Math.js 적용)
+        // ----------------------------------------
+        function execute() {
+            if (currentMode === 'equation') {
+                submitEquationCoefficient();
+                return;
+            }
+
+            if (!expression || expression.trim() === '') return;
+
+            try {
+                let evalExpr = expression;
+
+                // 1. 일반 모드 삼각함수 단위 가공 (DEG 각도 보정)
+                let customScope = {};
+                if (isDegreeMode) {
+                    evalExpr = evalExpr
+                        .replace(/sin\(/g, 'sin_deg(')
+                        .replace(/cos\(/g, 'cos_deg(')
+                        .replace(/tan\(/g, 'tan_deg(')
+                        .replace(/asin\(/g, 'asin_deg(')
+                        .replace(/acos\(/g, 'acos_deg(')
+                        .replace(/atan\(/g, 'atan_deg(');
+
+                    customScope = {
+                        sin_deg: (x) => Math.sin(x * Math.PI / 180),
+                        cos_deg: (x) => Math.cos(x * Math.PI / 180),
+                        tan_deg: (x) => Math.tan(x * Math.PI / 180),
+                        asin_deg: (x) => Math.asin(x) * 180 / Math.PI,
+                        acos_deg: (x) => Math.acos(x) * 180 / Math.PI,
+                        atan_deg: (x) => Math.atan(x) * 180 / Math.PI,
+                    };
+                }
+
+                // 2. 복소수 허수 연산 유효성 검증
+                if (currentMode !== 'complex' && evalExpr.includes('i')) {
+                    throw new Error("허수는 COMPLEX 모드에서 사용해 주세요.");
+                }
+
+                // 3. MathJS 안전 계산 수행
+                let rawRes = math.evaluate(evalExpr, customScope);
+
+                // 결과 형태 파악 가공 (복소수 형태 vs 표준 수치)
+                let finalStr = '';
+                if (typeof rawRes === 'object' && rawRes.isComplex) {
+                    // 복소수 출력 규격화
+                    let re = parseFloat(rawRes.re.toFixed(10));
+                    let im = parseFloat(rawRes.im.toFixed(10));
+                    if (im === 0) finalStr = `${re}`;
+                    else if (re === 0) finalStr = `${im}i`;
+                    else if (im > 0) finalStr = `${re} + ${im}i`;
+                    else finalStr = `${re} - ${Math.abs(im)}i`;
+                } else if (typeof rawRes === 'number') {
+                    finalStr = parseFloat(rawRes.toFixed(10)).toString();
+                } else {
+                    finalStr = rawRes.toString();
+                }
+
+                // 결과 노출 및 히스토리 누적
+                lcdResult.innerText = finalStr;
+                ansValue = finalStr;
+
+                history.push({ expr: displayExpr, result: finalStr });
+                historyIndex = history.length; // 최신 위치로 대기
+
+            } catch (err) {
+                console.error(err);
+                lcdResult.innerText = "Format ERROR";
+                toast(err.message);
+            }
+        }
+
+
+        // ----------------------------------------
+        // 다항 방정식 (Equation) 세부 제어 알고리즘
+        // ----------------------------------------
+        let eqnA = null, eqnB = null, eqnC = null;
+        let eqnInputBuffer = '';
+
+        function handleEquationInput(char) {
+            // 숫자 및 연산 기호, 소수점 조합
+            if (!isNaN(char) || char === '.' || char === '-') {
+                eqnInputBuffer += char;
+                lcdResult.innerText = eqnInputBuffer;
+            }
+        }
+
+        function submitEquationCoefficient() {
+            let val = parseFloat(eqnInputBuffer);
+            if (isNaN(val)) {
+                toast("유효한 숫자를 입력한 뒤 EXE를 누르세요.");
+                return;
+            }
+
+            if (eqnA === null) {
+                eqnA = val;
+                if (eqnA === 0) {
+                    toast("2차항 계수 a는 0이 될 수 없습니다.");
+                    eqnA = null;
+                    return;
+                }
+                eqnInputBuffer = '';
+                lcdFormula.innerText = `${eqnA}x^2 + bx + c = 0`;
+                lcdResult.innerText = "b 계수를 입력해 주세요:";
+            } else if (eqnB === null) {
+                eqnB = val;
+                eqnInputBuffer = '';
+                lcdFormula.innerText = `${eqnA}x^2 + (${eqnB})x + c = 0`;
+                lcdResult.innerText = "c 계수를 입력해 주세요:";
+            } else if (eqnC === null) {
+                eqnC = val;
+                eqnInputBuffer = '';
+                lcdFormula.innerText = `${eqnA}x^2 + (${eqnB})x + (${eqnC}) = 0`;
+                
+                // 방정식 공식 산출 (ax^2 + bx + c = 0)
+                solveQuadratic(eqnA, eqnB, eqnC);
+            } else {
+                // 이미 연산이 끝난 후 리셋 대기
+                clearScreen();
+            }
+        }
+
+        // 근의 공식 기반 2차 방정식 연산
+        function solveQuadratic(a, b, c) {
+            let disc = b*b - 4*a*c;
+            
+            if (disc > 0) {
+                let x1 = (-b + Math.sqrt(disc)) / (2*a);
+                let x2 = (-b - Math.sqrt(disc)) / (2*a);
+                lcdResult.innerText = `x1 = ${parseFloat(x1.toFixed(5))}\nx2 = ${parseFloat(x2.toFixed(5))}`;
+            } else if (disc === 0) {
+                let x = -b / (2*a);
+                lcdResult.innerText = `중근 x = ${parseFloat(x.toFixed(5))}`;
+            } else {
+                // 복소수 허근 연산
+                let realPart = -b / (2*a);
+                let imagPart = Math.sqrt(-disc) / (2*a);
+                let r = parseFloat(realPart.toFixed(5));
+                let im = parseFloat(imagPart.toFixed(5));
+                lcdResult.innerHTML = `x1 = ${r} + ${im}i<br>x2 = ${r} - ${im}i`;
+            }
+            // 재입력 가이드
+            toast("계산을 마쳤습니다. AC를 눌러 새로 시작하세요.");
+        }
+
+
+        // ----------------------------------------
+        // 히스토리 탐색 (방향키 활용)
+        // ----------------------------------------
+        function navigateHistory(direction) {
+            if (history.length === 0) return;
+
+            if (direction === 'up') {
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    loadHistoryItem(historyIndex);
+                }
+            } else if (direction === 'down') {
+                if (historyIndex < history.length - 1) {
+                    historyIndex++;
+                    loadHistoryItem(historyIndex);
+                } else {
+                    historyIndex = history.length;
+                    expression = '';
+                    displayExpr = '';
+                    updateScreen();
+                    lcdResult.innerText = '0';
+                }
+            }
+        }
+
+        function loadHistoryItem(idx) {
+            const item = history[idx];
+            displayExpr = item.expr;
+            // 내부 계산 식 파싱 기호 복구
+            expression = displayExpr.replace(/×/g, '*').replace(/÷/g, '/').replace(/π/g, 'pi').replace(/e/g, 'e').replace(/√\(/g, 'sqrt(');
+            updateScreen();
+            lcdResult.innerText = item.result;
+        }
+
+        function cursorMove(dir) {
+            toast(`커서 ${dir} 이동 (구현 대기)`);
+        }
+
+
+        // ----------------------------------------
+        // 키보드 연동 이벤트
+        // ----------------------------------------
+        function handlePhysicalKeyboard(e) {
+            const k = e.key;
+            if (!isNaN(k)) {
+                pressNum(k);
+            } else if (k === '.') {
+                pressNum('.');
+            } else if (k === '+') {
+                pressOp('+');
+            } else if (k === '-') {
+                pressOp('-');
+            } else if (k === '*') {
+                pressOp('*');
+            } else if (k === '/') {
+                pressOp('/');
+            } else if (k === 'Enter') {
+                e.preventDefault();
+                execute();
+            } else if (k === 'Backspace') {
+                backspace();
+            } else if (k === 'Escape') {
+                clearScreen();
+            }
+        }
+
+        // 화면 텍스트 클립보드 복사
+        function copyToClipboard() {
+            const rawText = `${lcdFormula.innerText} = ${lcdResult.innerText}`;
+            const el = document.createElement('textarea');
+            el.value = rawText;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+
+            closeModal('tools');
+            toast("계산 수식 전체가 복사되었습니다.");
+        }
+    </script>
+</body>
+</html>
+
+```
